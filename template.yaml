@@ -1,0 +1,116 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/runway-templates/schema/refs/heads/main/v1alpha1.json
+apiVersion: schema.runway.horse/templates/v1alpha1
+kind: Template
+
+metadata:
+  name: influxdb-2
+  version: 0.1.0
+  displayName: InfluxDB 2
+  description: |
+    Time series database for metrics, events, and IoT data. InfluxDB 2 with
+    the web UI, Flux, and InfluxQL. Single instance with persistence on a
+    volume. Published on a public HTTPS route; every request needs a token.
+  category: database
+  tags: [influxdb, timeseries, tsdb, metrics, iot, monitoring, telegraf]
+  logo: ./logo.svg
+  documentation: https://docs.influxdata.com/influxdb/v2/
+  website: https://www.influxdata.com
+  source: https://github.com/influxdata/influxdb
+  license: MIT
+  maintainer: runway
+
+inputs:
+  image_tag:
+    type: string
+    default: "2.9-alpine"
+    enum: ["2.9-alpine", "2.9", "2.8-alpine", "2.8"]
+    description: |
+      InfluxDB version. 2.9 is current, 2.8 is the previous release. Minor
+      upgrades migrate the data in place; a downgrade needs a backup and
+      restore.
+
+  organization:
+    type: string
+    default: "app"
+    pattern: "^[a-zA-Z][a-zA-Z0-9_-]{0,62}$"
+    description: Initial organization, created on first start.
+
+  bucket:
+    type: string
+    default: "app"
+    pattern: "^[a-zA-Z][a-zA-Z0-9_-]{0,62}$"
+    description: Initial bucket, created on first start.
+
+  retention:
+    type: string
+    default: "0"
+    pattern: "^(0|[1-9][0-9]*[hdw])$"
+    description: |
+      How long the initial bucket keeps data, e.g. '30d' or '12w'. '0' keeps
+      it forever. Only applied on first start; change it later in the UI.
+
+  username:
+    type: string
+    default: "admin"
+    pattern: "^[a-zA-Z][a-zA-Z0-9_-]{0,31}$"
+    description: Admin user for the web UI, created on first start.
+
+services:
+  - name: influxdb
+    image: "r.planetary-quantum.com/docker-hub-proxy/library/influxdb:${{ inputs.image_tag }}"
+
+    # No command override: the entrypoint reads DOCKER_INFLUXDB_INIT_* to run
+    # the initial setup before starting influxd. Overriding it skips that.
+
+    env:
+      PORT: "8086"
+      INFLUXD_REPORTING_DISABLED: "true"
+      # Default is /etc/influxdb2, which is not on the volume and not
+      # writable as a non-root user.
+      INFLUX_CONFIGS_PATH: "/var/lib/influxdb2/influx-configs"
+
+      DOCKER_INFLUXDB_INIT_MODE: "setup"
+      DOCKER_INFLUXDB_INIT_USERNAME: "${{ inputs.username }}"
+      DOCKER_INFLUXDB_INIT_PASSWORD:
+        value: "${{ runway.secret(32) }}"
+        description: Admin password for the web UI, set on the first start.
+        warning: |
+          Only read on the very first start, when the volume is empty.
+          Changing it here will NOT change the password in InfluxDB. Rotate
+          it in the UI or with 'influx user password' instead.
+      DOCKER_INFLUXDB_INIT_ORG: "${{ inputs.organization }}"
+      DOCKER_INFLUXDB_INIT_BUCKET: "${{ inputs.bucket }}"
+      DOCKER_INFLUXDB_INIT_RETENTION: "${{ inputs.retention }}"
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN:
+        value: "${{ runway.secret(64) }}"
+        description: |
+          Operator token with full access to every org. Use it to mint scoped
+          tokens — do not give it to Telegraf or apps.
+        warning: |
+          Only read on the very first start, when the volume is empty.
+          Changing it here will NOT change the token in InfluxDB and leaves
+          your clients with a value that does not work.
+
+    volume:
+      mountPath: /var/lib/influxdb2
+
+    # the image starts as root and drops to influxdb in its entrypoint
+    runAs:
+      user: 1000
+      group: 1000
+
+    healthcheck:
+      type: http
+      path: /health
+      # First start runs the setup before influxd listens for real.
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      timeoutSeconds: 5
+
+    settings:
+      # Telegraf, Grafana, and the web UI connect over HTTPS; tokens gate
+      # every request.
+      route: true
+
+    # The index and caches live in RAM; high-cardinality data needs more.
+    minPlan: start-m-launch
