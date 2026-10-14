@@ -22,13 +22,19 @@ WIP
 
 ## Connecting
 
-This one **is** routed: it gets a public HTTPS URL, so Telegraf, Grafana, and
-the web UI can reach it. Every API request needs a token.
+This one **is** routed. It gets a public HTTPS URL:
+
+```
+https://<app>.pqapp.dev
+```
+
+`<app>` is your app name. Telegraf, Grafana, and the web UI connect there.
+Every API request needs a token.
 
 The credentials are in the app config:
 
 ```sh
-runway app config ls --app my-influx
+runway app config ls --app <app>
 ```
 
 - Log in to the web UI with `<username>` and `DOCKER_INFLUXDB_INIT_PASSWORD`.
@@ -36,7 +42,7 @@ runway app config ls --app my-influx
   scoped tokens:
 
   ```sh
-  influx auth create --host https://my-influx.example.com \
+  influx auth create --host https://<app>.pqapp.dev \
     --token <DOCKER_INFLUXDB_INIT_ADMIN_TOKEN> \
     --org app --write-bucket <bucket-id>
   ```
