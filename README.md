@@ -20,6 +20,10 @@ WIP
 | `retention` | `0` | e.g. `30d`, `12w`; `0` keeps data forever. First start only |
 | `username` | `admin` | Admin user for the web UI |
 
+## Outputs
+
+`URL`
+
 ## Connecting
 
 This one **is** routed. It gets a public HTTPS URL:

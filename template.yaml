@@ -4,7 +4,7 @@ kind: Template
 
 metadata:
   name: influxdb-2
-  version: 0.1.0
+  version: 0.2.0
   displayName: InfluxDB 2
   description: |
     Time series database for metrics, events, and IoT data. InfluxDB 2 with
@@ -98,6 +98,9 @@ services:
     runAs:
       user: 1000
       group: 1000
+
+    outputs:
+      URL: "http://${{ runway.internal_address }}"
 
     healthcheck:
       type: http
